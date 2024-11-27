@@ -1,0 +1,25 @@
+name: assignment3_foodorder
+description: "A new Flutter project."
+
+publish_to: 'none'  # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=2.18.0 <3.0.0"  # Compatible Dart version range for Flutter
+
+dependencies:
+  flutter:
+    sdk: flutter
+  sqflite: ^2.0.0+4  # To interact with SQLite database
+  path: ^1.8.0  # To work with file paths (needed for sqflite)
+  cupertino_icons: ^1.0.8
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
