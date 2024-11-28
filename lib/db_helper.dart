@@ -86,16 +86,14 @@ class DBHelper {
     return await db.query('food_items');
   }
 
-  // Get order items by date
+  // Get order items for a specific date, ensuring no duplicates
   static Future<List<Map<String, dynamic>>> getOrderItemsForDate(String date) async {
     final db = await getDatabase();
     return await db.rawQuery('''
-      SELECT order_plans.id, order_plans.date, food_items.name, food_items.cost 
-      FROM order_plans
-      INNER JOIN order_items ON order_plans.id = order_items.order_id
-      INNER JOIN food_items ON order_items.food_id = food_items.id
-      WHERE order_plans.date = ?
-    ''', [date]);
+    SELECT DISTINCT order_plans.id, order_plans.date 
+    FROM order_plans
+    WHERE order_plans.date = ?
+  ''', [date]);
   }
 
   // Get an order by ID
@@ -103,5 +101,16 @@ class DBHelper {
     final db = await getDatabase();
     List<Map<String, dynamic>> result = await db.query('order_plans', where: 'id = ?', whereArgs: [id]);
     return result.isNotEmpty ? result.first : null;
+  }
+
+  // Get items for a specific order by its ID
+  static Future<List<Map<String, dynamic>>> getOrderItems(int orderId) async {
+    final db = await getDatabase();
+    return await db.rawQuery('''
+    SELECT food_items.name, food_items.cost, order_items.quantity 
+    FROM order_items
+    INNER JOIN food_items ON order_items.food_id = food_items.id
+    WHERE order_items.order_id = ?
+  ''', [orderId]);
   }
 }
