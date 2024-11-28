@@ -1,129 +1,107 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import 'food_item.dart';
 
 class DBHelper {
   static Database? _database;
 
-  // Singleton pattern to get the database instance
+  // Initialize the database
   static Future<Database> getDatabase() async {
     if (_database != null) {
       return _database!;
     }
-    // Create the database if it doesn't exist
-    _database = await _initDatabase();
+    _database = await _initDb();
     return _database!;
   }
 
-  // Initialize the database
-  static Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), 'food_ordering.db');
-    return openDatabase(
-      path,
-      onCreate: (db, version) async {
-        // Create food_items table
-        await db.execute('''
-          CREATE TABLE food_items(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            cost REAL
-          );
-        ''');
-
-        // Create order_plans table
-        await db.execute('''
-          CREATE TABLE order_plans(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            date TEXT,
-            food_id INTEGER,
-            FOREIGN KEY(food_id) REFERENCES food_items(id)
-          );
-        ''');
-
-        // Insert 20 predefined food items
-        List<Map<String, dynamic>> foodData = [
-          {'name': 'Pizza', 'cost': 12.5},
-          {'name': 'Burger', 'cost': 8.0},
-          {'name': 'Pasta', 'cost': 10.0},
-          {'name': 'Salad', 'cost': 5.5},
-          {'name': 'Sushi', 'cost': 15.0},
-          {'name': 'Fried Rice', 'cost': 7.0},
-          {'name': 'Ice Cream', 'cost': 4.0},
-          {'name': 'Fries', 'cost': 3.0},
-          {'name': 'Tacos', 'cost': 6.5},
-          {'name': 'Sandwich', 'cost': 5.0},
-          {'name': 'Steak', 'cost': 20.0},
-          {'name': 'Chicken Wings', 'cost': 9.0},
-          {'name': 'Noodles', 'cost': 8.5},
-          {'name': 'Pancakes', 'cost': 7.5},
-          {'name': 'Soup', 'cost': 4.5},
-          {'name': 'Grilled Cheese', 'cost': 6.0},
-          {'name': 'Hot Dog', 'cost': 3.5},
-          {'name': 'Burrito', 'cost': 7.0},
-          {'name': 'Smoothie', 'cost': 5.0},
-          {'name': 'Curry', 'cost': 11.0},
-        ];
-
-        // Insert predefined food items into the food_items table
-        for (var food in foodData) {
-          await db.insert(
-            'food_items',
-            food,
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
-        }
-      },
-      version: 1,
-    );
+  static Future<Database> _initDb() async {
+    String path = join(await getDatabasesPath(), 'food_order.db');
+    return openDatabase(path, version: 1, onCreate: _onCreate);
   }
 
-  // Fetch all food items from the database
-  static Future<List<FoodItem>> getFoodItems() async {
-    final db = await getDatabase();
-    final List<Map<String, dynamic>> maps = await db.query('food_items');
-    return List.generate(maps.length, (i) {
-      return FoodItem.fromMap(maps[i]);
-    });
+  static void _onCreate(Database db, int version) async {
+    await db.execute('''
+      CREATE TABLE food_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        cost REAL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE order_plans (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE order_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id INTEGER,
+        food_id INTEGER,
+        quantity INTEGER,
+        FOREIGN KEY (order_id) REFERENCES order_plans(id),
+        FOREIGN KEY (food_id) REFERENCES food_items(id)
+      )
+    ''');
+
+    // Insert sample food items into the database
+    await db.insert('food_items', {'name': 'Pizza', 'cost': 10.99});
+    await db.insert('food_items', {'name': 'Burger', 'cost': 5.99});
+    await db.insert('food_items', {'name': 'Pasta', 'cost': 8.49});
+    await db.insert('food_items', {'name': 'Sushi', 'cost': 15.99});
+    await db.insert('food_items', {'name': 'Salad', 'cost': 6.49});
+    await db.insert('food_items', {'name': 'Chicken Wings', 'cost': 7.99});
+    await db.insert('food_items', {'name': 'Steak', 'cost': 22.99});
+    await db.insert('food_items', {'name': 'Fish and Chips', 'cost': 12.49});
+    await db.insert('food_items', {'name': 'Tacos', 'cost': 3.99});
+    await db.insert('food_items', {'name': 'Cheeseburger', 'cost': 4.99});
+    await db.insert('food_items', {'name': 'Lasagna', 'cost': 10.49});
+    await db.insert('food_items', {'name': 'Fried Rice', 'cost': 7.49});
+    await db.insert('food_items', {'name': 'Grilled Cheese', 'cost': 4.49});
+    await db.insert('food_items', {'name': 'Hot Dog', 'cost': 3.49});
+    await db.insert('food_items', {'name': 'BBQ Ribs', 'cost': 19.99});
+    await db.insert('food_items', {'name': 'Pho', 'cost': 9.99});
+    await db.insert('food_items', {'name': 'Burrito', 'cost': 6.99});
+    await db.insert('food_items', {'name': 'Falafel', 'cost': 5.49});
+    await db.insert('food_items', {'name': 'Peking Duck', 'cost': 25.99});
+    await db.insert('food_items', {'name': 'Dim Sum', 'cost': 8.99});
   }
 
-  // Insert a new order plan into the database
-  static Future<void> insertOrderPlan(Map<String, dynamic> orderPlan) async {
+  // Insert an order plan
+  static Future<int> insertOrderPlan(Map<String, dynamic> orderPlan) async {
     final db = await getDatabase();
-    await db.insert(
-      'order_plans',
-      orderPlan,
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    return await db.insert('order_plans', orderPlan);
   }
 
-  // Get order plan by date
-  static Future<List<Map<String, dynamic>>> getOrderPlanByDate(String date) async {
+  // Insert order items
+  static Future<int> insertOrderItem(Map<String, dynamic> orderItem) async {
     final db = await getDatabase();
-    return await db.query(
-      'order_plans',
-      where: 'date = ?',
-      whereArgs: [date],
-    );
+    return await db.insert('order_items', orderItem);
   }
 
-  // Update an existing order plan entry
-  static Future<void> updateOrderPlan(int id, Map<String, dynamic> updatedOrder) async {
+  // Get food items
+  static Future<List<Map<String, dynamic>>> getFoodItems() async {
     final db = await getDatabase();
-    await db.update(
-      'order_plans',
-      updatedOrder,
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.query('food_items');
   }
 
-  // Delete an existing order plan entry
-  static Future<void> deleteOrderPlan(int id) async {
+  // Get order items by date
+  static Future<List<Map<String, dynamic>>> getOrderItemsForDate(String date) async {
     final db = await getDatabase();
-    await db.delete(
-      'order_plans',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.rawQuery('''
+      SELECT order_plans.id, order_plans.date, food_items.name, food_items.cost 
+      FROM order_plans
+      INNER JOIN order_items ON order_plans.id = order_items.order_id
+      INNER JOIN food_items ON order_items.food_id = food_items.id
+      WHERE order_plans.date = ?
+    ''', [date]);
+  }
+
+  // Get an order by ID
+  static Future<Map<String, dynamic>?> getOrderById(int id) async {
+    final db = await getDatabase();
+    List<Map<String, dynamic>> result = await db.query('order_plans', where: 'id = ?', whereArgs: [id]);
+    return result.isNotEmpty ? result.first : null;
   }
 }

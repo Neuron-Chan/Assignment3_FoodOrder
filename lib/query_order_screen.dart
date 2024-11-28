@@ -1,87 +1,60 @@
 import 'package:flutter/material.dart';
 import 'db_helper.dart';
-import 'food_item.dart';
 
 class QueryOrderScreen extends StatefulWidget {
+  const QueryOrderScreen({Key? key}) : super(key: key);
+
   @override
   _QueryOrderScreenState createState() => _QueryOrderScreenState();
 }
 
 class _QueryOrderScreenState extends State<QueryOrderScreen> {
-  List<FoodItem> foodItems = [];
-  String date = '';
-  List<FoodItem> queriedOrderItems = [];
+  final TextEditingController _dateController = TextEditingController();
+  List<Map<String, dynamic>> orderItems = [];
 
-  @override
-  void initState() {
-    super.initState();
-    _loadFoodItems();
-  }
-
-  // Load food items from the database
-  _loadFoodItems() async {
-    final items = await DBHelper.getFoodItems();
+  // Query order by date
+  queryOrderByDate(String date) async {
+    final items = await DBHelper.getOrderItemsForDate(date);
     setState(() {
-      foodItems = items;
+      orderItems = items;
     });
-  }
-
-  // Query order plan by date
-  _loadOrderPlanForDate() async {
-    final orderPlans = await DBHelper.getOrderPlanByDate(date);
-    setState(() {
-      queriedOrderItems.clear();
-    });
-
-    for (var order in orderPlans) {
-      final foodItem = foodItems.firstWhere((food) => food.id == order['food_id']);
-      setState(() {
-        queriedOrderItems.add(foodItem);
-      });
+    if (items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('No orders found for this date.'),
+        backgroundColor: Colors.red,
+      ));
     }
-  }
-
-  // Display the queried order plan for a specific date
-  _displayQueriedOrderPlan() {
-    if (queriedOrderItems.isEmpty) {
-      return Center(child: Text('No orders found for this date.'));
-    }
-    return ListView.builder(
-      itemCount: queriedOrderItems.length,
-      itemBuilder: (context, index) {
-        return ListTile(
-          title: Text(queriedOrderItems[index].name),
-          subtitle: Text('\$${queriedOrderItems[index].cost}'),
-        );
-      },
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Query an Order')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TextField(
-              onChanged: (value) {
-                setState(() {
-                  date = value;
-                });
+      appBar: AppBar(title: const Text('Query Orders')),
+      body: Column(
+        children: [
+          TextField(
+            controller: _dateController,
+            decoration: const InputDecoration(labelText: 'Enter Date (YYYY-MM-DD)'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              queryOrderByDate(_dateController.text);
+            },
+            child: const Text('Query Orders'),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: orderItems.length,
+              itemBuilder: (context, index) {
+                final order = orderItems[index];
+                return ListTile(
+                  title: Text('Order ID: ${order['id']}'),
+                  subtitle: Text('Date: ${order['date']}'),
+                );
               },
-              decoration: InputDecoration(labelText: 'Date (yyyy-mm-dd)'),
             ),
-            ElevatedButton(
-              onPressed: _loadOrderPlanForDate,
-              child: Text('Query Order Plan for Date'),
-            ),
-            Expanded(
-              child: _displayQueriedOrderPlan(),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

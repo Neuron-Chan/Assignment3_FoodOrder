@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'db_helper.dart';
-import 'food_item.dart';
+import 'db_helper.dart'; // Import your DBHelper file
 
 class MakeOrderScreen extends StatefulWidget {
   @override
@@ -8,89 +7,99 @@ class MakeOrderScreen extends StatefulWidget {
 }
 
 class _MakeOrderScreenState extends State<MakeOrderScreen> {
-  List<FoodItem> foodItems = [];
-  List<FoodItem> selectedFoodItems = [];
-  double targetCost = 0.0;
-  String date = '';
+  DateTime selectedDate = DateTime.now();
+  List<Map<String, dynamic>> foodItems = [];
+  List<int> selectedFoodIds = [];
+
+  final _dateController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadFoodItems();
+    _dateController.text = "${selectedDate.toLocal()}".split(' ')[0]; // Set the initial date to today's date
   }
 
-  // Load food items from the database
-  _loadFoodItems() async {
+  Future<void> _loadFoodItems() async {
     final items = await DBHelper.getFoodItems();
     setState(() {
       foodItems = items;
     });
   }
 
-  // Calculate the total cost of selected food items
-  double _calculateTotalCost() {
-    double total = 0.0;
-    for (var food in selectedFoodItems) {
-      total += food.cost;
-    }
-    return total;
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime picked = await showDatePicker(
+      context: context,
+      initialDate: selectedDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2101),
+    ) ?? selectedDate;
+    if (picked != selectedDate)
+      setState(() {
+        selectedDate = picked;
+        _dateController.text = "${selectedDate.toLocal()}".split(' ')[0]; // Format the date for display
+      });
   }
 
-  // Save the selected order plan
-  _saveOrderPlan() async {
-    if (_calculateTotalCost() > targetCost) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Total cost exceeds target!')));
+  Future<void> _submitOrder() async {
+    if (selectedFoodIds.isEmpty) {
+      // Show a message if no food item is selected
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Please select at least one food item.")));
       return;
     }
 
-    for (var food in selectedFoodItems) {
-      await DBHelper.insertOrderPlan({
-        'date': date,
-        'food_id': food.id,
+    // Prepare the order data to insert into the database
+    final orderId = await DBHelper.insertOrderPlan({
+      'date': selectedDate.toIso8601String(),
+    });
+
+    for (var foodId in selectedFoodIds) {
+      // Insert the food items in the 'order_items' table
+      await DBHelper.insertOrderItem({
+        'order_id': orderId,
+        'food_id': foodId,
       });
     }
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Order Plan Saved')));
+
+    // Show success message and navigate back
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Order saved successfully.")));
+    Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Make an Order')),
+      appBar: AppBar(title: Text("Make Order")),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(16.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
-              onChanged: (value) {
-                setState(() {
-                  targetCost = double.tryParse(value) ?? 0.0;
-                });
-              },
-              decoration: InputDecoration(labelText: 'Target Cost'),
-              keyboardType: TextInputType.number,
+            TextFormField(
+              controller: _dateController,
+              readOnly: true,
+              onTap: () => _selectDate(context),
+              decoration: InputDecoration(
+                labelText: "Select Date",
+                suffixIcon: Icon(Icons.calendar_today),
+              ),
             ),
-            TextField(
-              onChanged: (value) {
-                setState(() {
-                  date = value;
-                });
-              },
-              decoration: InputDecoration(labelText: 'Date (yyyy-mm-dd)'),
-            ),
+            SizedBox(height: 20),
+            Text("Select Food Items:"),
             Expanded(
               child: ListView.builder(
                 itemCount: foodItems.length,
                 itemBuilder: (context, index) {
                   return CheckboxListTile(
-                    title: Text(foodItems[index].name),
-                    subtitle: Text('\$${foodItems[index].cost}'),
-                    value: selectedFoodItems.contains(foodItems[index]),
+                    title: Text(foodItems[index]['name']),
+                    subtitle: Text("\$${foodItems[index]['cost']}"),
+                    value: selectedFoodIds.contains(foodItems[index]['id']),
                     onChanged: (bool? selected) {
                       setState(() {
-                        if (selected!) {
-                          selectedFoodItems.add(foodItems[index]);
+                        if (selected == true) {
+                          selectedFoodIds.add(foodItems[index]['id']);
                         } else {
-                          selectedFoodItems.remove(foodItems[index]);
+                          selectedFoodIds.remove(foodItems[index]['id']);
                         }
                       });
                     },
@@ -98,15 +107,9 @@ class _MakeOrderScreenState extends State<MakeOrderScreen> {
                 },
               ),
             ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Total Cost: \$${_calculateTotalCost()}'),
-                ElevatedButton(
-                  onPressed: _saveOrderPlan,
-                  child: Text('Save Order Plan'),
-                ),
-              ],
+            ElevatedButton(
+              onPressed: _submitOrder,
+              child: Text("Submit Order"),
             ),
           ],
         ),
